@@ -10,8 +10,8 @@
 
 namespace ReverseAD {
   
-//#include "tensor.ipp"
-#include "tensor2.ipp"
+#include "tensor.ipp"
+//#include "tensor2.ipp"
   
 //#include "generator/generator.ipp"
 static const size_t kOrderShift = 1000000;
@@ -244,11 +244,16 @@ void BaseReverseTensor<Base>::binary_generator(
       }
     }
     if (order > t_index.size()) {
-      case_code = (order - t_index.size()) * kOrderShift
+      /*case_code = (order - t_index.size()) * kOrderShift
                 + r_count * kRCountShift
                 + x_count * kXCountShift
-                + y_count * kYCountShift;
-      generator_binary(case_code, t_index, values[i], ginfo, global_deriv);
+                + y_count * kYCountShift;*/
+      size_t case_code = (order - t_index.size()) * kOrderShift
+                + r_count * kRCountShift;
+      size_t minor = x_count * kXCountShift
+                   + y_count * kYCountShift;
+
+      generator_binary(case_code, minor, t_index, values[i], ginfo, global_deriv);
     }
   }
 }

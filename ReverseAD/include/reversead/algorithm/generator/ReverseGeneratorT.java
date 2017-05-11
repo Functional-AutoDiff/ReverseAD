@@ -169,10 +169,14 @@ public class ReverseGeneratorT {
       l++;
     } 
     symmCoeff /= kFactorial[count];
-    String weight = "w="+symmCoeff+".0*sw";
+    String var_w = "w"+baseCount;
+    buffer1 += var_w+"="+symmCoeff+".0;";
+    String weight = "w="+var_w+"*sw";
     int xTotal = 0;
     int yTotal = 0;
+    String extra = "";
     for (int i = 1; i <= max_level; i++) {
+      extra = extra + BINARY_XY[b_index[i]] + " ";
       weight = weight + "*ginfo." + BINARY_XY[b_index[i]];
       xTotal += x_order[i];
       yTotal += y_order[i];
@@ -180,9 +184,17 @@ public class ReverseGeneratorT {
     weight += ";";
     multiSet = "D = Z; D.insert(ginfo.x,"+xTotal+"); D.insert(ginfo.y,"+yTotal+");";
     String update = "global_deriv.increase(D, w);";
-    dumpToFile(multiSet);
-    dumpToFile(weight);
-    dumpToFile(update);
+    //dumpToFile("// maxlevel: "+max_level+" w:"+symmCoeff+
+    //    " xTotal:"+xTotal+" yTotal:"+yTotal+" "+extra);
+    String item = "      " + multiSet + "\n" +
+                  "      " + weight + "\n" +
+                  "      " + update + "\n";
+    
+    buffer2 += item;
+    //dumpToFile(multiSet);
+    //dumpToFile(weight);
+    //dumpToFile(update);
+    baseCount += 1;
   }
 
   public void binaryRecursion(int curr_level, int max_level,
@@ -205,27 +217,49 @@ public class ReverseGeneratorT {
       y_order[curr_level] = 0;
     }
   }
+  String buffer1;
+  String buffer2;
+  int baseCount;
+  int curMajorCase;
+  HashMap global = new HashMap();
+
   public void generateBinarySingleFunc(int d, int r, int xC, int yC) {
-    int caseCode = d * D_SHIFT + r * R_SHIFT + xC * X_SHIFT + yC * Y_SHIFT;
-    String caseLine = "case " + caseCode + " : ";
+    int caseCodeFull = d * D_SHIFT + r * R_SHIFT + xC * X_SHIFT + yC * Y_SHIFT;
+    int caseCode = xC * X_SHIFT + yC * Y_SHIFT;
+    String caseLine = "case " + caseCode + ":";
     dumpToFile(caseLine);
-    dumpToFile("  {");
     indent += 4;
+    //dumpToFile("// d in (1..ORDER)="+d+", r in (1..d)="+r);
+    //dumpToFile("  // xCount="+xC+" yCount="+yC);
+    //dumpToFile("  {");
+    baseCount = 0;
+    buffer1 = "";
+    buffer2 = "";
     b_index = new int[r+1];
     x_order = new int[r+1];
     y_order = new int[r+1];
     x_order[0] = xC;
     y_order[0] = yC;
     binaryRecursion(1, r, 0, 0, d);
+    dumpToFile(buffer1);
+    Object res = global.get(buffer2);
+    if (res != null) {
+      //dumpToFile("    found at: "+res);
+    } else {
+      global.put(buffer2,caseCodeFull);
+      //int save = indent; indent = 0;
+      //dumpToFile(buffer2);
+      //indent = save;
+    }
+    dumpToFile("break;");
     indent -= 4;
-    dumpToFile("  }");
-    dumpToFile("  break;");
   }
 
   public void generateBinary() {
     dumpToFile("template <typename Base>");
     String funcDecl = "void generator_binary " +
         "(size_t case_code, " + 
+        "size_t minor, " + 
         "const TensorIndex<locint>& Z, const Base& sw, " +
         "const TensorDerivativeInfo<locint, Base>& ginfo, " +
         "TensorDeriv<locint, Base>& global_deriv) {";
@@ -233,15 +267,38 @@ public class ReverseGeneratorT {
     indent += 2;
     dumpToFile("TensorIndex<locint> D;");
     dumpToFile("Base w;");
+    String wDecl = "Base w0";
+    for (int i = 1; i < 100; i++) {
+      wDecl += ",w"+i;
+    }
+    wDecl += ";";
+    dumpToFile(wDecl);
     dumpToFile("switch (case_code) {");
     indent += 2;
     for (int i = 1; i <= ORDER; i++) {
       for (int r = 1; r <= i; r++) {
+
+        int caseCode = i * D_SHIFT + r * R_SHIFT;
+        dumpToFile("case " + caseCode + " :");
+        indent += 2;
+        dumpToFile("switch (minor) {");
+        indent += 2;
+
         for (int x_count = 0; x_count <= ORDER - i; x_count++) {
           for (int y_count = 0; y_count <= ORDER - i - x_count; y_count++) {
             generateBinarySingleFunc(i, r, x_count, y_count);
           }
         }
+
+        indent -= 2;
+        dumpToFile("}");
+
+        int save = indent; indent = 0;
+        dumpToFile(buffer2);
+        indent = save;
+
+        dumpToFile("break;");
+        indent -= 2;
       }
     }      
     indent -= 2;
